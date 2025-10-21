@@ -12,18 +12,21 @@ using SafeScribe.Application.Mappings;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
+// =====================================
 // DATABASE CONFIGURATION
+// =====================================
 builder.Services.AddDbContext<SafeScribeContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServerConnection"))
 );
 
-
+// =====================================
 // CONTROLLERS
+// =====================================
 builder.Services.AddControllers();
 
-
+// =====================================
 // JWT CONFIGURATION
+// =====================================
 var jwt = builder.Configuration.GetSection("Jwt");
 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
 
@@ -33,93 +36,96 @@ builder.Services
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            // Valida se o token foi assinado utilizando a chave correta.
             ValidateIssuerSigningKey = true,
-
-            // Define a chave secreta usada para validar a assinatura do token.
             IssuerSigningKey = key,
 
-            // Habilita a validação do issuer do token.
             ValidateIssuer = true,
-
-            // Define o emissor esperado do token (valor do campo "iss").
             ValidIssuer = jwt["Issuer"],
 
-            // Habilita a validação do audience do token.
+            // Se quiser validar o Audience, pode deixar "true".
+            // Se quiser simplificar os testes, "false" é aceitável.
             ValidateAudience = true,
-
-            // Define o público-alvo esperado .
             ValidAudience = jwt["Audience"],
 
-            // Define a margem de tolerância para expiração do token.
-            // Quando definido como zero, o token expira exatamente no horário indicado.
+            ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero,
 
-            // Habilita a verificação do tempo de vida do token (expiração).
-            ValidateLifetime = true
+            // 🔥 ESSENCIAL: mapeia os claims corretos (role e nome)
+            NameClaimType = System.Security.Claims.ClaimTypes.Name,
+            RoleClaimType = System.Security.Claims.ClaimTypes.Role
+        };
+
+        // 🔍 Ativa logging detalhado de falhas (útil pra debug de 401)
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"[JWT ERROR] {context.Exception.Message}");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = context =>
+            {
+                Console.WriteLine($"[JWT OK] Usuário autenticado: {context.Principal?.Identity?.Name}");
+                return Task.CompletedTask;
+            }
         };
     });
 
 builder.Services.AddAuthorization();
 
+// =====================================
 // DEPENDENCY INJECTION
-
-// Repositórios
+// =====================================
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<INoteRepository, NoteRepository>();
 
-// Serviços de aplicação
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<NoteService>();
 
-// Serviços relacionados a autenticação
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddSingleton<ITokenBlacklistService, InMemoryTokenBlacklistService>();
 
-// AutoMapper
+// =====================================
+// AUTOMAPPER CONFIGURATION
+// =====================================
 builder.Services.AddAutoMapper(cfg =>
 {
     cfg.AddMaps(typeof(NoteProfile).Assembly);
 });
 
+// =====================================
 // SWAGGER CONFIGURATION (com JWT)
-
+// =====================================
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
+builder.Services.AddSwaggerGen(c =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "SafeScribe API",
-        Version = "v1",
-        Description = "API de autenticação e autorização com JWT"
-    });
+    c.SwaggerDoc("v1", new() { Title = "SafeScribe", Version = "v1" });
 
-    var securityScheme = new OpenApiSecurityScheme
+    var jwtSecurityScheme = new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
-        Name = "Authorization",
-        Description = "Insira o token JWT no formato: Bearer {seu_token}",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Name = "JWT Authentication",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Description = "Insira o token JWT no campo abaixo.",
+        Reference = new Microsoft.OpenApi.Models.OpenApiReference
+        {
+            Id = JwtBearerDefaults.AuthenticationScheme,
+            Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme
+        }
     };
 
-    options.AddSecurityDefinition("Bearer", securityScheme);
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    c.AddSecurityDefinition(jwtSecurityScheme.Reference.Id, jwtSecurityScheme);
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
+        { jwtSecurityScheme, Array.Empty<string>() }
     });
 });
 
+// =====================================
+// BUILD APP
+// =====================================
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -130,9 +136,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication();
-app.UseMiddleware<JwtBlacklistMiddleware>();
-app.UseAuthorization();
+// ✅ Ordem obrigatória
+app.UseAuthentication();                     // 1º - valida token
+app.UseMiddleware<JwtBlacklistMiddleware>(); // 2º - checa blacklist
+app.UseAuthorization();                      // 3º - valida roles
 
 app.MapControllers();
 

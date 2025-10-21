@@ -1,4 +1,5 @@
 ﻿using Microsoft.IdentityModel.Tokens;
+using SafeScribe.Domain.Enums;
 using SafeScribe.Domain.Interfaces;
 using SafeScribe.Domain.Models;
 using System.IdentityModel.Tokens.Jwt;
@@ -26,7 +27,7 @@ public class TokenService : ITokenService
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(ClaimTypes.Name, user.Username),
-            new(ClaimTypes.Role, user.Role.ToString()),
+            new(ClaimTypes.Role, Enum.GetName(typeof(RoleUser), user.Role) ?? "Leitor"),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

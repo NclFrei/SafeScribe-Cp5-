@@ -13,6 +13,13 @@ public class NoteProfile : Profile
             .ForMember(dest => dest.CreateAt, opt => opt.Ignore())
             .ForMember(dest => dest.UserId, opt => opt.Ignore());
 
-        CreateMap<Note, NoteResponseDTO>();
+        CreateMap<Note, NoteResponseDTO>()
+            .ConstructUsing(src => new NoteResponseDTO(
+                src.Id,
+                src.Title,
+                src.Content,
+                src.CreateAt,
+                src.UserId
+            ));
     }
 }
