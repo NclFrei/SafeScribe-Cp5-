@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace SafeScribe.Migrations
+namespace SafeScribe.Infrastructure.Data.Migrations
 {
     /// <inheritdoc />
     public partial class AddUserAndNote : Migration

@@ -29,7 +29,6 @@ public class NoteService
     public async Task<NoteResponseDTO> CreateAsync(NoteCreateDTO dto, Guid userId)
     {
         var note = _mapper.Map<Note>(dto);
-        note.UserId = userId;
 
         await _repository.AddAsync(note);
         await _repository.SaveChangesAsync();

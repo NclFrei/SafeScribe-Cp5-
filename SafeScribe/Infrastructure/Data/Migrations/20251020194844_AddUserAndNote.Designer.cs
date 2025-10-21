@@ -9,7 +9,7 @@ using SafeScribe.Infrastructure.Data;
 
 #nullable disable
 
-namespace SafeScribe.Migrations
+namespace SafeScribe.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(SafeScribeContext))]
     [Migration("20251020194844_AddUserAndNote")]

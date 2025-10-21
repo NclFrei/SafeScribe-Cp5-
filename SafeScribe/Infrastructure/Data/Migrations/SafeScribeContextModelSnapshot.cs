@@ -8,7 +8,7 @@ using SafeScribe.Infrastructure.Data;
 
 #nullable disable
 
-namespace SafeScribe.Migrations
+namespace SafeScribe.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(SafeScribeContext))]
     partial class SafeScribeContextModelSnapshot : ModelSnapshot
